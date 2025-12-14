@@ -4,17 +4,25 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Dynamically create a job for each path in the PATHS secret
-  check-endpoints:
+  ping:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        path: ${{ fromJson(secrets.PATHS) }}  # Parse the comma-separated list into an array
     steps:
-      - name: Ping each endpoint
+      # Step 1: Set PATHS array from secret
+      - name: Set PATHS array
+        id: set_paths
         run: |
-          FULL_URL="${{ secrets.ATTENDANCE_TRACKER }}/${{ matrix.path }}"
-          echo "Pinging $FULL_URL..."
-          curl -fsS --retry 3 --retry-delay 5 "$FULL_URL"
-        env:
-          ATTENDANCE_TRACKER: ${{ secrets.ATTENDANCE_TRACKER }}  # Base URL stored in secrets
+          # Split the PATHS environment secret into an array using IFS
+          IFS=',' read -r -a paths <<< "${{ secrets.PATHS }}"
+          # Output the paths as a string for later use in the loop
+          echo "paths=${paths[@]}" >> $GITHUB_ENV
+
+      # Step 2: Ping each endpoint
+      - name: Ping each endpoint for each path
+        run: |
+          # Iterate over each path in the PATHS array and ping the endpoint
+          for path in ${{ env.paths }}; do
+            FULL_URL="${{ secrets.ATTENDANCE_TRACKER }}/${path}"
+            echo "Pinging $FULL_URL..."
+            # Attempt to ping the URL with retries and report success/failure
+            curl -fsS --retry 3 --retry-delay 5 "$FULL_URL" || echo "Failed to ping $FULL_URL"
+          done
