@@ -1,25 +1,20 @@
 name: Attendance Tracker Health Check
 
 on:
-  #schedule:
-  #  - cron: '*/15 * * * *'   # every 15 minutes
   workflow_dispatch:
 
 jobs:
-  ping:
+  # Dynamically create a job for each path in the PATHS secret
+  check-endpoints:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        path: ${{ fromJson(secrets.PATHS) }}  # Parse the comma-separated list into an array
     steps:
-      - name: Ping endpoints
+      - name: Ping each endpoint
         run: |
-          # Split the PATHS environment secret into an array using IFS
-          IFS=',' read -r -a paths <<< "$PATHS"
-          
-          # Iterate over each path and ping the endpoint
-          for path in "${paths[@]}"; do
-            FULL_URL="${{ secrets.ATTENDANCE_TRACKER }}/${path}"
-            echo "Pinging $FULL_URL..."
-            curl -fsS --retry 3 --retry-delay 5 "$FULL_URL"
-          done
+          FULL_URL="${{ secrets.ATTENDANCE_TRACKER }}/${{ matrix.path }}"
+          echo "Pinging $FULL_URL..."
+          curl -fsS --retry 3 --retry-delay 5 "$FULL_URL"
         env:
           ATTENDANCE_TRACKER: ${{ secrets.ATTENDANCE_TRACKER }}  # Base URL stored in secrets
-          PATHS: ${{ secrets.PATHS }}  # Paths stored in secrets
